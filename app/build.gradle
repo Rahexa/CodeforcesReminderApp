@@ -4,6 +4,7 @@ plugins {
 }
 
 android {
+    namespace 'com.example.codeforcesreminder'
     compileSdk 34
     defaultConfig {
         applicationId "com.example.codeforcesreminder"
