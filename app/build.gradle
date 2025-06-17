@@ -38,9 +38,9 @@ dependencies {
     implementation libs.bundles.androidx
     implementation libs.volley
     testImplementation libs.junit
-    // Jetpack Compose dependencies
+    // Jetpack Compose Material 3 dependencies
     implementation "androidx.compose.ui:ui:1.6.0"
-    implementation "androidx.compose.material:material:1.6.0"
+    implementation "androidx.compose.material3:material3:1.1.0" // Material 3
     implementation "androidx.compose.ui:ui-tooling-preview:1.6.0"
     implementation "androidx.activity:activity-compose:1.8.0"
     // Optional: For testing
