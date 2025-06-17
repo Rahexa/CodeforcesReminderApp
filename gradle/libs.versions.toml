@@ -5,6 +5,9 @@ material = "1.12.0"
 constraintlayout = "2.1.4"
 volley = "1.2.1"
 junit = "4.13.2"
+compose = "1.6.0"
+material3 = "1.1.0" // Add Material 3 version
+activityCompose = "1.8.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidXCore" }
@@ -13,6 +16,10 @@ material = { module = "com.google.android.material:material", version.ref = "mat
 constraintlayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintlayout" }
 volley = { module = "com.android.volley:volley", version.ref = "volley" }
 junit = { module = "junit:junit", version.ref = "junit" }
+compose-ui = { module = "androidx.compose.ui:ui", version.ref = "compose" }
+compose-material3 = { module = "androidx.compose.material3:material3", version.ref = "material3" } // Update to material3
+compose-ui-tooling = { module = "androidx.compose.ui:ui-tooling-preview", version.ref = "compose" }
+activity-compose = { module = "androidx.activity:activity-compose", version.ref = "activityCompose" }
 
 [bundles]
 androidx = ["androidx-core-ktx", "androidx-appcompat", "material", "constraintlayout"]
