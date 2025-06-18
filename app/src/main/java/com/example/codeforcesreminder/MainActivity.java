@@ -5,20 +5,24 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri; // ✅ FIXED: Added missing import
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
+
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.app.AppCompatDelegate;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -30,6 +34,7 @@ public class MainActivity extends AppCompatActivity {
     private List<Contest> contestList;
     private RequestQueue requestQueue;
     private AlarmManager alarmManager;
+
     private static final String API_URL = "https://codeforces.com/api/contest.list?gym=false";
     private static final String PREFS_NAME = "CodeforcesPrefs";
     private static final String KEY_REMINDER_OFFSET = "reminderOffset";
@@ -38,13 +43,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
         recyclerView = findViewById(R.id.recyclerView);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         contestList = new ArrayList<>();
         adapter = new ContestAdapter(contestList, this::openContestLink, this::scheduleNotification);
         recyclerView.setAdapter(adapter);
+
         requestQueue = Volley.newRequestQueue(this);
         alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+
         fetchContests();
     }
 
@@ -63,22 +71,28 @@ public class MainActivity extends AppCompatActivity {
                                 contestList.add(new Contest(id, name, startTimeSeconds));
                             }
                         }
-                        // Sort contests by start time in ascending order
+
+                        // Sort contests by start time
                         Collections.sort(contestList, new Comparator<Contest>() {
                             @Override
                             public int compare(Contest c1, Contest c2) {
                                 return Long.compare(c1.getStartTime(), c2.getStartTime());
                             }
                         });
+
                         adapter.notifyDataSetChanged();
-                        // Schedule reminders after fetching
+
+                        // Automatically schedule reminders
                         int reminderOffset = getSavedReminderOffset();
                         scheduleReminders(contestList, reminderOffset);
+
                     } catch (Exception e) {
                         Toast.makeText(this, "Error parsing data", Toast.LENGTH_SHORT).show();
                     }
                 },
-                error -> Toast.makeText(this, "Error fetching contests", Toast.LENGTH_SHORT).show());
+                error -> Toast.makeText(this, "Error fetching contests", Toast.LENGTH_SHORT).show()
+        );
+
         requestQueue.add(request);
     }
 
@@ -89,8 +103,14 @@ public class MainActivity extends AppCompatActivity {
                 Intent intent = new Intent(this, NotificationReceiver.class);
                 intent.putExtra("contest_name", contest.getName());
                 intent.putExtra("contest_id", contest.getId());
+
                 PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                        this, contest.getId(), intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                        this,
+                        contest.getId(),
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+
                 alarmManager.setExact(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent);
             }
         }
@@ -103,15 +123,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void scheduleNotification(Contest contest, long reminderTime) {
-        // No manual scheduling needed; handled automatically in fetchContests
+        // Placeholder for optional manual reminder button
     }
 
-    private int getSavedReminderOffset() {
+    // ✅ FIXED: Made public to allow access from SettingsActivity
+    public int getSavedReminderOffset() {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        return prefs.getInt(KEY_REMINDER_OFFSET, 15); // Default to 15 minutes
+        return prefs.getInt(KEY_REMINDER_OFFSET, 15); // Default 15 mins
     }
 
-    private void saveReminderOffset(int offset) {
+    // ✅ FIXED: Made public to allow access from SettingsActivity
+    public void saveReminderOffset(int offset) {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
         prefs.edit().putInt(KEY_REMINDER_OFFSET, offset).apply();
     }
