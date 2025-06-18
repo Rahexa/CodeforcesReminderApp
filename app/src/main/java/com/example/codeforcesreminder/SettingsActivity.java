@@ -13,9 +13,14 @@ public class SettingsActivity extends AppCompatActivity {
         setContentView(R.layout.activity_settings);
         Switch darkModeSwitch = findViewById(R.id.darkModeSwitch);
         EditText reminderOffsetEditText = findViewById(R.id.reminderOffsetEditText);
-        MainActivity mainActivity = new MainActivity(); // Temporary instance to access method
 
-        // Load saved values
+        // Load saved values using the application context
+        MainActivity mainActivity = (MainActivity) getIntent().getParcelableExtra("mainActivity");
+        if (mainActivity == null) {
+            // Fallback to creating a new instance (not ideal, but works for now)
+            mainActivity = new MainActivity();
+        }
+
         darkModeSwitch.setChecked(AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES);
         reminderOffsetEditText.setText(String.valueOf(mainActivity.getSavedReminderOffset()));
 
@@ -26,11 +31,15 @@ public class SettingsActivity extends AppCompatActivity {
 
         reminderOffsetEditText.setOnFocusChangeListener((v, hasFocus) -> {
             if (!hasFocus) {
-                int offset = Integer.parseInt(reminderOffsetEditText.getText().toString());
-                mainActivity.saveReminderOffset(offset); // Save new offset
-                // Restart activity to apply changes (simplified approach)
-                finish();
-                startActivity(getIntent());
+                try {
+                    int offset = Integer.parseInt(reminderOffsetEditText.getText().toString());
+                    mainActivity.saveReminderOffset(offset);
+                    // Restart activity to apply changes
+                    finish();
+                    startActivity(getIntent());
+                } catch (NumberFormatException e) {
+                    reminderOffsetEditText.setError("Please enter a valid number");
+                }
             }
         });
     }
