@@ -7,6 +7,8 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 
 public class SettingsActivity extends AppCompatActivity {
+    private MainActivity mainActivityInstance; // Field to hold the instance
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -14,15 +16,12 @@ public class SettingsActivity extends AppCompatActivity {
         Switch darkModeSwitch = findViewById(R.id.darkModeSwitch);
         EditText reminderOffsetEditText = findViewById(R.id.reminderOffsetEditText);
 
-        // Load saved values using the application context
-        MainActivity mainActivity = (MainActivity) getIntent().getParcelableExtra("mainActivity");
-        if (mainActivity == null) {
-            // Fallback to creating a new instance (not ideal, but works for now)
-            mainActivity = new MainActivity();
-        }
+        // Initialize mainActivityInstance (workaround, improve later if possible)
+        mainActivityInstance = new MainActivity(); // Temporary instance
 
+        // Load saved values
         darkModeSwitch.setChecked(AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES);
-        reminderOffsetEditText.setText(String.valueOf(mainActivity.getSavedReminderOffset()));
+        reminderOffsetEditText.setText(String.valueOf(mainActivityInstance.getSavedReminderOffset()));
 
         // Set listeners
         darkModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
@@ -32,8 +31,9 @@ public class SettingsActivity extends AppCompatActivity {
         reminderOffsetEditText.setOnFocusChangeListener((v, hasFocus) -> {
             if (!hasFocus) {
                 try {
-                    int offset = Integer.parseInt(reminderOffsetEditText.getText().toString());
-                    mainActivity.saveReminderOffset(offset);
+                    String offsetText = reminderOffsetEditText.getText().toString();
+                    int offset = Integer.parseInt(offsetText.isEmpty() ? "15" : offsetText); // Default to 15 if empty
+                    mainActivityInstance.saveReminderOffset(offset);
                     // Restart activity to apply changes
                     finish();
                     startActivity(getIntent());
