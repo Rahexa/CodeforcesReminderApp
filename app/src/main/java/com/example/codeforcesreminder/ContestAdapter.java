@@ -1,16 +1,13 @@
 package com.example.codeforcesreminder;
 
-import android.app.TimePickerDialog;
 import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 import java.text.SimpleDateFormat;
-import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 
@@ -47,21 +44,8 @@ public class ContestAdapter extends RecyclerView.Adapter<ContestAdapter.ViewHold
         SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
         holder.contestTime.setText(sdf.format(contest.getStartTime()));
         holder.itemView.setOnClickListener(v -> clickListener.onContestClick(contest));
-        holder.setReminderButton.setOnClickListener(v -> {
-            Calendar calendar = Calendar.getInstance();
-            new TimePickerDialog(holder.itemView.getContext(), (view, hour, minute) -> {
-                Calendar reminder = Calendar.getInstance();
-                reminder.setTimeInMillis(contest.getStartTime());
-                reminder.set(Calendar.HOUR_OF_DAY, hour);
-                reminder.set(Calendar.MINUTE, minute);
-                if (reminder.getTimeInMillis() > System.currentTimeMillis()) {
-                    reminderListener.onScheduleReminder(contest, reminder.getTimeInMillis());
-                } else {
-                    reminder.setTimeInMillis(contest.getStartTime() - 30 * 60 * 1000); // Default to 30 min before
-                    reminderListener.onScheduleReminder(contest, reminder.getTimeInMillis());
-                }
-            }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show();
-        });
+        // Remove setReminderButton logic since reminders are automatic
+        holder.setReminderButton.setVisibility(View.GONE);
     }
 
     @Override
@@ -71,7 +55,7 @@ public class ContestAdapter extends RecyclerView.Adapter<ContestAdapter.ViewHold
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView contestName, contestTime;
-        Button setReminderButton;
+        TextView setReminderButton; // Changed to TextView to match layout removal
 
         ViewHolder(View itemView) {
             super(itemView);
