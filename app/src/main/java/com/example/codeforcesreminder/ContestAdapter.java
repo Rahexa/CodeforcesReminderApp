@@ -1,6 +1,5 @@
 package com.example.codeforcesreminder;
 
-import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -44,8 +43,7 @@ public class ContestAdapter extends RecyclerView.Adapter<ContestAdapter.ViewHold
         SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
         holder.contestTime.setText(sdf.format(contest.getStartTime()));
         holder.itemView.setOnClickListener(v -> clickListener.onContestClick(contest));
-        // Remove setReminderButton logic since reminders are automatic
-        holder.setReminderButton.setVisibility(View.GONE);
+        // Reminder buttons removed
     }
 
     @Override
@@ -55,13 +53,11 @@ public class ContestAdapter extends RecyclerView.Adapter<ContestAdapter.ViewHold
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         TextView contestName, contestTime;
-        TextView setReminderButton; // Changed to TextView to match layout removal
 
         ViewHolder(View itemView) {
             super(itemView);
             contestName = itemView.findViewById(R.id.contestName);
             contestTime = itemView.findViewById(R.id.contestTime);
-            setReminderButton = itemView.findViewById(R.id.setReminderButton);
         }
     }
 }
