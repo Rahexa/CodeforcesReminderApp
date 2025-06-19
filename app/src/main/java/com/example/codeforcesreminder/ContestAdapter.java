@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Locale;
 
 public class ContestAdapter extends RecyclerView.Adapter<ContestAdapter.ViewHolder> {
+
     private final List<Contest> contests;
     private final OnContestClickListener clickListener;
 
@@ -27,18 +28,17 @@ public class ContestAdapter extends RecyclerView.Adapter<ContestAdapter.ViewHold
 
     @NonNull
     @Override
-    public ContestAdapter.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_contest, parent, false);
-        return new ViewHolder(v);
+    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_contest, parent, false);
+        return new ViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ContestAdapter.ViewHolder holder, int position) {
+    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         Contest contest = contests.get(position);
         holder.contestName.setText(contest.getName());
         SimpleDateFormat sdf = new SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault());
         holder.contestTime.setText(sdf.format(contest.getStartTime()));
-
         holder.itemView.setOnClickListener(v -> clickListener.onContestClick(contest));
     }
 
