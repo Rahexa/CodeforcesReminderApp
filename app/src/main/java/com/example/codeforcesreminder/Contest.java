@@ -11,7 +11,15 @@ public class Contest {
         this.startTime = startTime;
     }
 
-    public int getId() { return id; }
-    public String getName() { return name; }
-    public long getStartTime() { return startTime; }
+    public int getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public long getStartTime() {
+        return startTime;
+    }
 }
