@@ -1,29 +1,32 @@
 package com.example.codeforcesreminder;
 
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.widget.EditText;
 import android.widget.Switch;
+
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.app.AppCompatDelegate;
 
 public class SettingsActivity extends AppCompatActivity {
-    private MainActivity mainActivityInstance; // Field to hold the instance
+
+    private static final String PREFS_NAME = "CodeforcesPrefs";
+    private static final String KEY_REMINDER_OFFSET = "reminderOffset";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_settings);
+
         Switch darkModeSwitch = findViewById(R.id.darkModeSwitch);
         EditText reminderOffsetEditText = findViewById(R.id.reminderOffsetEditText);
 
-        // Initialize mainActivityInstance (workaround, improve later if possible)
-        mainActivityInstance = new MainActivity(); // Temporary instance
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
 
-        // Load saved values
+        // Initialize UI elements
         darkModeSwitch.setChecked(AppCompatDelegate.getDefaultNightMode() == AppCompatDelegate.MODE_NIGHT_YES);
-        reminderOffsetEditText.setText(String.valueOf(mainActivityInstance.getSavedReminderOffset()));
+        reminderOffsetEditText.setText(String.valueOf(prefs.getInt(KEY_REMINDER_OFFSET, 15)));
 
-        // Set listeners
         darkModeSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             AppCompatDelegate.setDefaultNightMode(isChecked ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
         });
@@ -31,14 +34,10 @@ public class SettingsActivity extends AppCompatActivity {
         reminderOffsetEditText.setOnFocusChangeListener((v, hasFocus) -> {
             if (!hasFocus) {
                 try {
-                    String offsetText = reminderOffsetEditText.getText().toString();
-                    int offset = Integer.parseInt(offsetText.isEmpty() ? "15" : offsetText); // Default to 15 if empty
-                    mainActivityInstance.saveReminderOffset(offset);
-                    // Restart activity to apply changes
-                    finish();
-                    startActivity(getIntent());
+                    int offset = Integer.parseInt(reminderOffsetEditText.getText().toString());
+                    prefs.edit().putInt(KEY_REMINDER_OFFSET, offset).apply();
                 } catch (NumberFormatException e) {
-                    reminderOffsetEditText.setError("Please enter a valid number");
+                    reminderOffsetEditText.setError("Enter a valid number");
                 }
             }
         });
