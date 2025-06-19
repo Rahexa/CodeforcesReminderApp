@@ -12,6 +12,7 @@ import android.view.MenuItem;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -39,9 +40,14 @@ public class MainActivity extends AppCompatActivity {
     private static final String API_URL = "https://codeforces.com/api/contest.list?gym=false";
     private static final String PREFS_NAME = "CodeforcesPrefs";
     private static final String KEY_REMINDER_OFFSET = "reminderOffset";
+    private static final String KEY_DARK_MODE = "darkMode";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        boolean darkModeEnabled = prefs.getBoolean(KEY_DARK_MODE, false);
+        AppCompatDelegate.setDefaultNightMode(darkModeEnabled ? AppCompatDelegate.MODE_NIGHT_YES : AppCompatDelegate.MODE_NIGHT_NO);
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -65,62 +71,68 @@ public class MainActivity extends AppCompatActivity {
                         contestList.clear();
                         for (int i = 0; i < contests.length(); i++) {
                             JSONObject contest = contests.getJSONObject(i);
-                            if (contest.getString("phase").equals("BEFORE")) {
+                            if ("BEFORE".equals(contest.getString("phase"))) {
                                 String name = contest.getString("name");
-                                long startTimeMillis = contest.getLong("startTimeSeconds") * 1000;
+                                long startTimeSeconds = contest.getLong("startTimeSeconds") * 1000;
                                 int id = contest.getInt("id");
-                                contestList.add(new Contest(id, name, startTimeMillis));
+                                contestList.add(new Contest(id, name, startTimeSeconds));
                             }
                         }
-
                         Collections.sort(contestList, Comparator.comparingLong(Contest::getStartTime));
                         adapter.notifyDataSetChanged();
 
-                        int reminderOffset = getSavedReminderOffset();
-                        scheduleReminders(contestList, reminderOffset);
-
+                        scheduleReminders(contestList);
                     } catch (Exception e) {
                         Toast.makeText(this, "Error parsing contest data", Toast.LENGTH_SHORT).show();
                     }
                 },
-                error -> Toast.makeText(this, "Error fetching contests", Toast.LENGTH_SHORT).show());
-
+                error -> Toast.makeText(this, "Error fetching contests", Toast.LENGTH_SHORT).show()
+        );
         requestQueue.add(request);
     }
 
-    private void scheduleReminders(List<Contest> contests, int offsetMinutes) {
+    private int[] getSavedReminderOffsets() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String offsetsString = prefs.getString(KEY_REMINDER_OFFSET, "60,15,5");
+        try {
+            String[] parts = offsetsString.split(",");
+            int[] offsets = new int[parts.length];
+            for (int i = 0; i < parts.length; i++) {
+                offsets[i] = Integer.parseInt(parts[i].trim());
+            }
+            return offsets;
+        } catch (Exception e) {
+            return new int[]{60, 15, 5};
+        }
+    }
+
+    private void scheduleReminders(List<Contest> contests) {
+        int[] offsets = getSavedReminderOffsets();
+
         for (Contest contest : contests) {
-            long reminderTime = contest.getStartTime() - (offsetMinutes * 60 * 1000L);
-            if (reminderTime > System.currentTimeMillis()) {
-                Intent intent = new Intent(this, NotificationReceiver.class);
-                intent.putExtra("contest_name", contest.getName());
-                intent.putExtra("contest_id", contest.getId());
+            for (int offsetMinutes : offsets) {
+                long reminderTime = contest.getStartTime() - offsetMinutes * 60 * 1000L;
+                if (reminderTime > System.currentTimeMillis()) {
+                    Intent intent = new Intent(this, NotificationReceiver.class);
+                    intent.putExtra("contest_name", contest.getName());
+                    intent.putExtra("contest_id", contest.getId());
+                    intent.putExtra("offset", offsetMinutes);
 
-                PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                        this,
-                        contest.getId(),
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                    int notificationId = contest.getId() * 1000 + offsetMinutes;
+                    PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                            this, notificationId, intent,
+                            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent);
+                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent);
+                }
             }
         }
-        Toast.makeText(this, "Reminders set for upcoming contests", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "Reminders set!", Toast.LENGTH_SHORT).show();
     }
 
     private void openContestLink(Contest contest) {
         Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("https://codeforces.com/contest/" + contest.getId()));
         startActivity(browserIntent);
-    }
-
-    public int getSavedReminderOffset() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        return prefs.getInt(KEY_REMINDER_OFFSET, 15);
-    }
-
-    public void saveReminderOffset(int offset) {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putInt(KEY_REMINDER_OFFSET, offset).apply();
     }
 
     @Override
