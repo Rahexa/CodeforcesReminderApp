@@ -91,7 +91,7 @@ public class NotificationService extends Service {
 
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.unique_alarm);
+Uri soundUri = Uri.parse("android.resource://" + getPackageName() + "/" + R.raw.alarm_sound);
             AudioAttributes audioAttributes = new AudioAttributes.Builder()
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                     .setUsage(AudioAttributes.USAGE_NOTIFICATION)
