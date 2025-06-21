@@ -1,216 +1,60 @@
 package com.example.codeforcesreminder;
 
-import android.app.AlarmManager;
-import android.app.PendingIntent;
-import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
-import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
-import android.view.Menu;
-import android.view.MenuItem;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
 
-import com.android.volley.Request;
-import com.android.volley.RequestQueue;
-import com.android.volley.toolbox.JsonObjectRequest;
-import com.android.volley.toolbox.Volley;
+public class SettingsActivity extends AppCompatActivity {
 
-import org.json.JSONArray;
-import org.json.JSONObject;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-
-public class MainActivity extends AppCompatActivity {
-
-    private RecyclerView recyclerView;
-    private ContestAdapter adapter;
-    private List<Contest> contestList;
-    private RequestQueue requestQueue;
-    private AlarmManager alarmManager;
-
-    private static final String API_URL = "https://codeforces.com/api/contest.list?gym=false";
     private static final String PREFS_NAME = "CodeforcesPrefs";
     private static final String KEY_REMINDER_OFFSET = "reminderOffset";
-    private static final String KEY_CONTESTS_JSON = "contestsJson";
 
-    private Handler uiHandler = new Handler(Looper.getMainLooper());
+    private EditText reminderOffsetEditText;
+    private Button saveButton;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_settings);
 
-        recyclerView = findViewById(R.id.recyclerView);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        contestList = new ArrayList<>();
-        adapter = new ContestAdapter(contestList, this::openContestLink);
-        recyclerView.setAdapter(adapter);
+        reminderOffsetEditText = findViewById(R.id.reminderOffsetEditText);
+        saveButton = findViewById(R.id.saveButton);
 
-        requestQueue = Volley.newRequestQueue(this);
-        alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        // SharedPreferences থেকে আগে সেট করা মান নিয়ে আসা
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        int savedOffset = prefs.getInt(KEY_REMINDER_OFFSET, 15);  // default 15 mins
+        reminderOffsetEditText.setText(String.valueOf(savedOffset));
 
-        fetchContests();
-    }
+        // Save বাটনে ক্লিক করলে মান সংরক্ষণ
+        saveButton.setOnClickListener(v -> {
+            String input = reminderOffsetEditText.getText().toString().trim();
+            if (input.isEmpty()) {
+                Toast.makeText(SettingsActivity.this, "Please enter a reminder offset", Toast.LENGTH_SHORT).show();
+                return;
+            }
 
-  private void fetchContests() {
-    JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, API_URL, null,
-        response -> {
+            int offset;
             try {
-                JSONArray contests = response.getJSONArray("result");
-                contestList.clear();
-
-                for (int i = 0; i < contests.length(); i++) {
-                    JSONObject contest = contests.getJSONObject(i);
-                    String phase = contest.getString("phase");
-                    if ("BEFORE".equals(phase)) {
-                        String name = contest.getString("name");
-                        long startTimeMillis = contest.getLong("startTimeSeconds") * 1000;
-                        int id = contest.getInt("id");
-                        contestList.add(new Contest(id, name, startTimeMillis, phase)); // phase যোগ হলো
-                    }
+                offset = Integer.parseInt(input);
+                if (offset <= 0) {
+                    Toast.makeText(SettingsActivity.this, "Enter a positive number", Toast.LENGTH_SHORT).show();
+                    return;
                 }
-
-                // Sort by start time
-                Collections.sort(contestList, Comparator.comparingLong(Contest::getStartTime));
-
-                adapter.notifyDataSetChanged();
-
-                // Save contests JSON string for widget
-                saveContestsJson(contests.toString());
-
-                // Schedule reminders
-                int offset = getSavedReminderOffset();
-                scheduleReminders(offset);
-
-                // Update countdown widget
-                CountdownWidget.updateWidget(this);
-
-            } catch (Exception e) {
-                Toast.makeText(this, "Error parsing contests", Toast.LENGTH_SHORT).show();
-                e.printStackTrace();
+            } catch (NumberFormatException e) {
+                Toast.makeText(SettingsActivity.this, "Invalid number format", Toast.LENGTH_SHORT).show();
+                return;
             }
-        },
-        error -> Toast.makeText(this, "Failed to fetch contests", Toast.LENGTH_SHORT).show()
-    );
 
-    requestQueue.add(request);
-}
+            // SharedPreferences-এ নতুন মান সংরক্ষণ করা হচ্ছে
+            SharedPreferences.Editor editor = prefs.edit();
+            editor.putInt(KEY_REMINDER_OFFSET, offset);
+            editor.apply();
 
-    private void saveContestsJson(String json) {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putString(KEY_CONTESTS_JSON, json).apply();
-    }
-
-    public int getSavedReminderOffset() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        return prefs.getInt(KEY_REMINDER_OFFSET, 15);
-    }
-
-    public void saveReminderOffset(int offset) {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        prefs.edit().putInt(KEY_REMINDER_OFFSET, offset).apply();
-    }
-
-    private void scheduleReminders(int offsetMinutes) {
-        for (Contest contest : contestList) {
-            long reminderTime = contest.getStartTime() - (offsetMinutes * 60 * 1000);
-            if (reminderTime > System.currentTimeMillis()) {
-                Intent intent = new Intent(this, NotificationReceiver.class);
-                intent.putExtra("contest_name", contest.getName());
-                intent.putExtra("contest_id", contest.getId());
-
-                PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                        this,
-                        contest.getId(),
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-                );
-
-                alarmManager.setExact(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent);
-            }
-        }
-        Toast.makeText(this, "Reminders scheduled", Toast.LENGTH_SHORT).show();
-    }
-
-    // এই মেথড সব পূর্বের সেট করা এলার্ম বাতিল করবে
-    private void cancelAllAlarms() {
-        if (alarmManager == null) {
-            alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-        }
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String contestsJson = prefs.getString(KEY_CONTESTS_JSON, null);
-        if (contestsJson == null) return;
-
-        try {
-            JSONArray contests = new JSONArray(contestsJson);
-            for (int i = 0; i < contests.length(); i++) {
-                JSONObject contest = contests.getJSONObject(i);
-                int contestId = contest.getInt("id");
-
-                Intent intent = new Intent(this, NotificationReceiver.class);
-                PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                        this,
-                        contestId,
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-                );
-
-                alarmManager.cancel(pendingIntent);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void openContestLink(Contest contest) {
-        Intent browserIntent = new Intent(Intent.ACTION_VIEW,
-                Uri.parse("https://codeforces.com/contest/" + contest.getId()));
-        startActivity(browserIntent);
-    }
-
-    // Refresh countdown timers every second in UI
-    @Override
-    protected void onResume() {
-        super.onResume();
-        uiHandler.postDelayed(updateRunnable, 1000);
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        uiHandler.removeCallbacks(updateRunnable);
-    }
-
-    private final Runnable updateRunnable = new Runnable() {
-        @Override
-        public void run() {
-            adapter.notifyDataSetChanged();
-            uiHandler.postDelayed(this, 1000);
-        }
-    };
-
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main_menu, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == R.id.action_settings) {
-            startActivity(new Intent(this, SettingsActivity.class));
-            return true;
-        }
-        return super.onOptionsItemSelected(item);
+            Toast.makeText(SettingsActivity.this, "Reminder offset saved: " + offset + " minutes", Toast.LENGTH_SHORT).show();
+        });
     }
 }
