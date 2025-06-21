@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widgetLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/widget_background"
+    android:padding="12dp">
+
+    <TextView
+        android:id="@+id/widgetContestName"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Next Contest"
+        android:textSize="16sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"/>
+
+    <TextView
+        android:id="@+id/widgetCountdown"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Starts in 00:00:00"
+        android:layout_below="@id/widgetContestName"
+        android:textColor="#FFEB3B"
+        android:textSize="14sp"
+        android:layout_marginTop="4dp"/>
+
+</RelativeLayout>
