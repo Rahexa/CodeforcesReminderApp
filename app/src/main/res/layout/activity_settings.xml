@@ -1,31 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
-  xmlns:android="http://schemas.android.com/apk/res/android"
-  android:orientation="vertical"
-  android:padding="24dp"
-  android:layout_width="match_parent"
-  android:layout_height="match_parent"
-  android:background="?android:attr/windowBackground">
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:padding="16dp"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
 
-  <Switch
-      android:id="@+id/darkModeSwitch"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="Enable Dark Mode" />
+    <EditText
+        android:id="@+id/reminderOffsetEditText"
+        android:inputType="number"
+        android:hint="Enter reminder offset (minutes)"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 
-  <EditText
-      android:id="@+id/reminderOffsetEditText"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:inputType="number"
-      android:hint="Reminder before contest (minutes)"
-      android:layout_marginTop="24dp" />
-
-  <Button
-      android:id="@+id/saveButton"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:text="Save"
-      android:layout_marginTop="24dp" />
+    <Button
+        android:id="@+id/saveButton"
+        android:text="Save"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"/>
 
 </LinearLayout>
