@@ -1,64 +1,89 @@
 package com.example.codeforcesreminder;
 
-import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.os.SystemClock;
+import android.content.SharedPreferences;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.RemoteViews;
 
-import java.text.SimpleDateFormat;
-import java.util.List;
-import java.util.Locale;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 public class CountdownWidget extends AppWidgetProvider {
-    private static final String UPDATE_ACTION = "com.example.codeforcesreminder.UPDATE_WIDGET";
+
+    private static final String PREFS_NAME = "CodeforcesPrefs";
+    private static final String KEY_CONTESTS_JSON = "contestsJson";
+
+    private static Handler handler = new Handler(Looper.getMainLooper());
+    private static Runnable updateRunnable;
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
         updateWidget(context);
-        scheduleNextUpdate(context);
     }
 
     public static void updateWidget(Context context) {
-        ContestFetcher.fetchUpcomingContests(context, contests -> {
-            if (contests != null && !contests.isEmpty()) {
-                Contest nextContest = contests.get(0);
-                long timeLeft = nextContest.getStartTime() - System.currentTimeMillis();
+        SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        String contestsJson = prefs.getString(KEY_CONTESTS_JSON, null);
+        long now = System.currentTimeMillis();
+        String nextContestName = "No upcoming contest";
+        long nextContestStart = Long.MAX_VALUE;
 
-                long hours = timeLeft / (1000 * 60 * 60);
-                long minutes = (timeLeft / (1000 * 60)) % 60;
+        if (contestsJson != null) {
+            try {
+                JSONArray arr = new JSONArray(contestsJson);
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject contest = arr.getJSONObject(i);
+                    String phase = contest.getString("phase");
+                    if (!"BEFORE".equals(phase)) continue;
 
-                String countdown = String.format(Locale.getDefault(), "Starts in: %02d:%02d", hours, minutes);
-                String title = nextContest.getName();
-
-                RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_countdown);
-                views.setTextViewText(R.id.widgetTitle, title);
-                views.setTextViewText(R.id.widgetTimeLeft, countdown);
-
-                AppWidgetManager manager = AppWidgetManager.getInstance(context);
-                ComponentName widget = new ComponentName(context, CountdownWidget.class);
-                manager.updateAppWidget(widget, views);
+                    long startTime = contest.getLong("startTimeSeconds") * 1000;
+                    if (startTime > now && startTime < nextContestStart) {
+                        nextContestStart = startTime;
+                        nextContestName = contest.getString("name");
+                    }
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-        });
-    }
+        }
 
-    private void scheduleNextUpdate(Context context) {
-        Intent intent = new Intent(context, CountdownWidget.class);
-        intent.setAction(AppWidgetManager.ACTION_APPWIDGET_UPDATE);
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                context,
-                0,
-                intent,
-                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT
-        );
+        long diff = nextContestStart - now;
+        String countdownText = "No upcoming contest";
+        if (diff > 0 && diff != Long.MAX_VALUE) {
+            long seconds = diff / 1000;
+            long hrs = seconds / 3600;
+            long mins = (seconds % 3600) / 60;
+            long secs = seconds % 60;
+            countdownText = String.format("Starts in %02d:%02d:%02d", hrs, mins, secs);
+        }
 
-        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        long intervalMillis = 60 * 1000; // ১ মিনিট পর পর আপডেট
-        long triggerAtMillis = SystemClock.elapsedRealtime() + intervalMillis;
-        alarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAtMillis, pendingIntent);
+        AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
+        ComponentName thisWidget = new ComponentName(context, CountdownWidget.class);
+        int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
+
+        for (int appWidgetId : appWidgetIds) {
+            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_countdown);
+            views.setTextViewText(R.id.widgetContestName, nextContestName);
+            views.setTextViewText(R.id.widgetCountdown, countdownText);
+
+            Intent intent = new Intent(context, MainActivity.class);
+            PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+            views.setOnClickPendingIntent(R.id.widgetLayout, pendingIntent);
+
+            appWidgetManager.updateAppWidget(appWidgetId, views);
+        }
+
+        // Schedule next update in 1 sec
+        if (updateRunnable != null) {
+            handler.removeCallbacks(updateRunnable);
+        }
+        updateRunnable = () -> updateWidget(context);
+        handler.postDelayed(updateRunnable, 1000);
     }
 }
