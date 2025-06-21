@@ -62,51 +62,49 @@ public class MainActivity extends AppCompatActivity {
         fetchContests();
     }
 
-    private void fetchContests() {
-        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, API_URL, null,
-                response -> {
-                    try {
-                        JSONArray contests = response.getJSONArray("result");
-                        contestList.clear();
+  private void fetchContests() {
+    JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, API_URL, null,
+        response -> {
+            try {
+                JSONArray contests = response.getJSONArray("result");
+                contestList.clear();
 
-                        for (int i = 0; i < contests.length(); i++) {
-                            JSONObject contest = contests.getJSONObject(i);
-                            if ("BEFORE".equals(contest.getString("phase"))) {
-                                String name = contest.getString("name");
-                                long startTimeMillis = contest.getLong("startTimeSeconds") * 1000;
-                                int id = contest.getInt("id");
-                                contestList.add(new Contest(id, name, startTimeMillis));
-                            }
-                        }
-
-                        // Sort by start time
-                        Collections.sort(contestList, Comparator.comparingLong(Contest::getStartTime));
-
-                        adapter.notifyDataSetChanged();
-
-                        // Save contests JSON string for widget and alarm cancel
-                        saveContestsJson(contests.toString());
-
-                        // Cancel all previously set alarms first
-                        cancelAllAlarms();
-
-                        // Schedule new reminders with saved offset
-                        int offset = getSavedReminderOffset();
-                        scheduleReminders(offset);
-
-                        // Update countdown widget
-                        CountdownWidget.updateWidget(this);
-
-                    } catch (Exception e) {
-                        Toast.makeText(this, "Error parsing contests", Toast.LENGTH_SHORT).show();
-                        e.printStackTrace();
+                for (int i = 0; i < contests.length(); i++) {
+                    JSONObject contest = contests.getJSONObject(i);
+                    String phase = contest.getString("phase");
+                    if ("BEFORE".equals(phase)) {
+                        String name = contest.getString("name");
+                        long startTimeMillis = contest.getLong("startTimeSeconds") * 1000;
+                        int id = contest.getInt("id");
+                        contestList.add(new Contest(id, name, startTimeMillis, phase)); // phase যোগ হলো
                     }
-                },
-                error -> Toast.makeText(this, "Failed to fetch contests", Toast.LENGTH_SHORT).show()
-        );
+                }
 
-        requestQueue.add(request);
-    }
+                // Sort by start time
+                Collections.sort(contestList, Comparator.comparingLong(Contest::getStartTime));
+
+                adapter.notifyDataSetChanged();
+
+                // Save contests JSON string for widget
+                saveContestsJson(contests.toString());
+
+                // Schedule reminders
+                int offset = getSavedReminderOffset();
+                scheduleReminders(offset);
+
+                // Update countdown widget
+                CountdownWidget.updateWidget(this);
+
+            } catch (Exception e) {
+                Toast.makeText(this, "Error parsing contests", Toast.LENGTH_SHORT).show();
+                e.printStackTrace();
+            }
+        },
+        error -> Toast.makeText(this, "Failed to fetch contests", Toast.LENGTH_SHORT).show()
+    );
+
+    requestQueue.add(request);
+}
 
     private void saveContestsJson(String json) {
         SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
