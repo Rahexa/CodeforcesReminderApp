@@ -5,70 +5,71 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
-import java.util.Locale;
-import java.util.concurrent.TimeUnit;
 
-public class ContestAdapter extends RecyclerView.Adapter<ContestAdapter.ViewHolder> {
+public class ContestAdapter extends RecyclerView.Adapter<ContestAdapter.ContestViewHolder> {
 
-    private final List<Contest> contestList;
-    private final OnContestClickListener clickListener;
-
-    public interface OnContestClickListener {
-        void onContestClick(Contest contest);
+    public interface OnItemClickListener {
+        void onItemClick(Contest contest);
     }
 
-    public ContestAdapter(List<Contest> contests, OnContestClickListener listener) {
-        this.contestList = contests;
-        this.clickListener = listener;
-    }
+    private List<Contest> contests;
+    private OnItemClickListener listener;
 
-    @NonNull
-    @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View v = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_contest, parent, false);
-        return new ViewHolder(v);
+    public ContestAdapter(List<Contest> contests, OnItemClickListener listener) {
+        this.contests = contests;
+        this.listener = listener;
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        Contest contest = contestList.get(position);
-        holder.contestName.setText(contest.getName());
-
-        long millisLeft = contest.getStartTime() - System.currentTimeMillis();
-
-        if (millisLeft > 0) {
-            holder.countdown.setText(formatDuration(millisLeft));
-        } else {
-            holder.countdown.setText("Started");
-        }
-
-        holder.itemView.setOnClickListener(v -> clickListener.onContestClick(contest));
+    public ContestViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
+        View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.contest_item, parent, false);
+        return new ContestViewHolder(view);
     }
 
-    private String formatDuration(long millis) {
-        long hrs = TimeUnit.MILLISECONDS.toHours(millis);
-        long mins = TimeUnit.MILLISECONDS.toMinutes(millis) % 60;
-        long secs = TimeUnit.MILLISECONDS.toSeconds(millis) % 60;
-
-        return String.format(Locale.getDefault(), "Starts in: %02d hr %02d min %02d sec", hrs, mins, secs);
+    @Override
+    public void onBindViewHolder(ContestViewHolder holder, int position) {
+        Contest contest = contests.get(position);
+        holder.bind(contest, listener);
     }
 
     @Override
     public int getItemCount() {
-        return contestList.size();
+        return contests.size();
     }
 
-    static class ViewHolder extends RecyclerView.ViewHolder {
-        TextView contestName, countdown;
+    static class ContestViewHolder extends RecyclerView.ViewHolder {
 
-        ViewHolder(@NonNull View itemView) {
+        TextView contestNameTextView;
+        TextView countdownTextView;
+
+        public ContestViewHolder(View itemView) {
             super(itemView);
-            contestName = itemView.findViewById(R.id.contestName);
-            countdown = itemView.findViewById(R.id.contestCountdown);
+            contestNameTextView = itemView.findViewById(R.id.contestNameTextView);
+            countdownTextView = itemView.findViewById(R.id.countdownTextView);
+        }
+
+        public void bind(Contest contest, OnItemClickListener listener) {
+            contestNameTextView.setText(contest.getName());
+
+            long diffMillis = contest.getStartTime() - System.currentTimeMillis();
+            if (diffMillis > 0) {
+                countdownTextView.setText(formatMillis(diffMillis));
+            } else {
+                countdownTextView.setText("Started");
+            }
+
+            itemView.setOnClickListener(v -> listener.onItemClick(contest));
+        }
+
+        private String formatMillis(long millis) {
+            long seconds = millis / 1000;
+            long hrs = seconds / 3600;
+            long mins = (seconds % 3600) / 60;
+            long secs = seconds % 60;
+            return String.format("Starts in: %02d:%02d:%02d", hrs, mins, secs);
         }
     }
 }
