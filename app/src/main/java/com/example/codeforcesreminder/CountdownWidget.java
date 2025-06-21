@@ -3,87 +3,87 @@ package com.example.codeforcesreminder;
 import android.app.PendingIntent;
 import android.appwidget.AppWidgetManager;
 import android.appwidget.AppWidgetProvider;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Handler;
-import android.os.Looper;
 import android.widget.RemoteViews;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
+
+import java.util.Date;
 
 public class CountdownWidget extends AppWidgetProvider {
 
     private static final String PREFS_NAME = "CodeforcesPrefs";
     private static final String KEY_CONTESTS_JSON = "contestsJson";
 
-    private static Handler handler = new Handler(Looper.getMainLooper());
-    private static Runnable updateRunnable;
-
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
-        updateWidget(context);
+        for (int widgetId : appWidgetIds) {
+            updateWidget(context, appWidgetManager, widgetId);
+        }
     }
 
     public static void updateWidget(Context context) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        int[] ids = manager.getAppWidgetIds(new android.content.ComponentName(context, CountdownWidget.class));
+        for (int widgetId : ids) {
+            updateWidget(context, manager, widgetId);
+        }
+    }
+
+    private static void updateWidget(Context context, AppWidgetManager manager, int widgetId) {
+        RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_layout);
+
         SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        String contestsJson = prefs.getString(KEY_CONTESTS_JSON, null);
-        long now = System.currentTimeMillis();
-        String nextContestName = "No upcoming contest";
-        long nextContestStart = Long.MAX_VALUE;
+        String contestsJson = prefs.getString(KEY_CONTESTS_JSON, "");
 
-        if (contestsJson != null) {
-            try {
-                JSONArray arr = new JSONArray(contestsJson);
-                for (int i = 0; i < arr.length(); i++) {
-                    JSONObject contest = arr.getJSONObject(i);
-                    String phase = contest.getString("phase");
-                    if (!"BEFORE".equals(phase)) continue;
+        String contestName = "No upcoming contests";
+        String countdown = "";
 
-                    long startTime = contest.getLong("startTimeSeconds") * 1000;
-                    if (startTime > now && startTime < nextContestStart) {
-                        nextContestStart = startTime;
-                        nextContestName = contest.getString("name");
-                    }
+        try {
+            JSONArray contests = new JSONArray(contestsJson);
+            long now = System.currentTimeMillis();
+
+            long closestStartTime = Long.MAX_VALUE;
+            String nextContest = "";
+
+            for (int i = 0; i < contests.length(); i++) {
+                JSONObject contest = contests.getJSONObject(i);
+                String phase = contest.optString("phase", "");
+                long startTime = contest.optLong("startTimeSeconds", 0) * 1000;
+
+                if ("BEFORE".equals(phase) && startTime > now && startTime < closestStartTime) {
+                    closestStartTime = startTime;
+                    nextContest = contest.optString("name", "");
                 }
-            } catch (Exception e) {
-                e.printStackTrace();
             }
-        }
 
-        long diff = nextContestStart - now;
-        String countdownText = "No upcoming contest";
-        if (diff > 0 && diff != Long.MAX_VALUE) {
-            long seconds = diff / 1000;
-            long hrs = seconds / 3600;
-            long mins = (seconds % 3600) / 60;
-            long secs = seconds % 60;
-            countdownText = String.format("Starts in %02d:%02d:%02d", hrs, mins, secs);
-        }
+            if (!nextContest.isEmpty()) {
+                contestName = nextContest;
+                long diff = closestStartTime - now;
+                countdown = formatMillis(diff);
+            }
+        } catch (Exception ignored) {}
 
-        AppWidgetManager appWidgetManager = AppWidgetManager.getInstance(context);
-        ComponentName thisWidget = new ComponentName(context, CountdownWidget.class);
-        int[] appWidgetIds = appWidgetManager.getAppWidgetIds(thisWidget);
+        views.setTextViewText(R.id.widget_contest_name, contestName);
+        views.setTextViewText(R.id.widget_countdown, countdown.isEmpty() ? "" : "Starts in: " + countdown);
 
-        for (int appWidgetId : appWidgetIds) {
-            RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.widget_countdown);
-            views.setTextViewText(R.id.widgetContestName, nextContestName);
-            views.setTextViewText(R.id.widgetCountdown, countdownText);
+        Intent intent = new Intent(context, MainActivity.class);
+        PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        views.setOnClickPendingIntent(R.id.widget_root, pendingIntent);
 
-            Intent intent = new Intent(context, MainActivity.class);
-            PendingIntent pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-            views.setOnClickPendingIntent(R.id.widgetLayout, pendingIntent);
+        manager.updateAppWidget(widgetId, views);
+    }
 
-            appWidgetManager.updateAppWidget(appWidgetId, views);
-        }
-
-        // Schedule next update in 1 sec
-        if (updateRunnable != null) {
-            handler.removeCallbacks(updateRunnable);
-        }
-        updateRunnable = () -> updateWidget(context);
-        handler.postDelayed(updateRunnable, 1000);
+    private static String formatMillis(long millis) {
+        long seconds = millis / 1000;
+        long hrs = seconds / 3600;
+        long mins = (seconds % 3600) / 60;
+        long secs = seconds % 60;
+        return String.format("%02d:%02d:%02d", hrs, mins, secs);
     }
 }
