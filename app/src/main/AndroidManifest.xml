@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -9,7 +11,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.CodeforcesReminder">
-        
+
         <activity android:name=".SettingsActivity" />
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
@@ -19,6 +21,13 @@
         </activity>
 
         <receiver android:name=".NotificationReceiver" android:exported="false" />
-        <service android:name=".NotificationService" android:exported="false" />
+
+        <receiver android:name=".CountdownWidget" android:exported="false">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+        </receiver>
+
     </application>
+
 </manifest>
