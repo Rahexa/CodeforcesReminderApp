@@ -9,6 +9,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -36,11 +38,9 @@ public class MainActivity extends AppCompatActivity {
     private RequestQueue requestQueue;
     private AlarmManager alarmManager;
 
-    private static final String CF_API_URL = "https://codeforces.com/api/contest.list?gym=false";
-    private static final String CC_API_URL = "https://www.codechef.com/api/list/contests/all";
-
+    private static final String API_URL = "https://codeforces.com/api/contest.list?gym=false";
     private static final String PREFS_NAME = "CodeforcesPrefs";
-    private static final String KEY_REMINDER_OFFSETS = "reminderOffsets"; // store 3 reminder times comma separated
+    private static final String KEY_REMINDER_OFFSET = "reminderOffset";
     private static final String KEY_CONTESTS_JSON = "contestsJson";
 
     private Handler uiHandler = new Handler(Looper.getMainLooper());
@@ -59,149 +59,124 @@ public class MainActivity extends AppCompatActivity {
         requestQueue = Volley.newRequestQueue(this);
         alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
 
-        fetchAllContests();
+        fetchContests();
     }
 
-    private void fetchAllContests() {
-        fetchContestsFromCodeforces(() -> fetchContestsFromCodeChef(() -> {
-            // After fetching both, update UI and schedule reminders
-            Collections.sort(contestList, Comparator.comparingLong(Contest::getStartTime));
-            adapter.notifyDataSetChanged();
-
-            saveContestsJson();
-
-            scheduleAllReminders();
-
-            CountdownWidget.updateWidget(this);
-        }));
-    }
-
-    private void fetchContestsFromCodeforces(Runnable callback) {
-        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, CF_API_URL, null,
+    private void fetchContests() {
+        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, API_URL, null,
                 response -> {
                     try {
                         JSONArray contests = response.getJSONArray("result");
+                        contestList.clear();
+
                         for (int i = 0; i < contests.length(); i++) {
                             JSONObject contest = contests.getJSONObject(i);
                             if ("BEFORE".equals(contest.getString("phase"))) {
                                 String name = contest.getString("name");
                                 long startTimeMillis = contest.getLong("startTimeSeconds") * 1000;
                                 int id = contest.getInt("id");
-                                contestList.add(new Contest(id, name, startTimeMillis, "codeforces"));
+                                contestList.add(new Contest(id, name, startTimeMillis));
                             }
                         }
+
+                        // Sort by start time
+                        Collections.sort(contestList, Comparator.comparingLong(Contest::getStartTime));
+
+                        adapter.notifyDataSetChanged();
+
+                        // Save contests JSON string for widget and alarm cancel
+                        saveContestsJson(contests.toString());
+
+                        // Cancel all previously set alarms first
+                        cancelAllAlarms();
+
+                        // Schedule new reminders with saved offset
+                        int offset = getSavedReminderOffset();
+                        scheduleReminders(offset);
+
+                        // Update countdown widget
+                        CountdownWidget.updateWidget(this);
+
                     } catch (Exception e) {
+                        Toast.makeText(this, "Error parsing contests", Toast.LENGTH_SHORT).show();
                         e.printStackTrace();
                     }
-                    callback.run();
                 },
-                error -> {
-                    Toast.makeText(this, "Failed to fetch Codeforces contests", Toast.LENGTH_SHORT).show();
-                    callback.run();
-                });
+                error -> Toast.makeText(this, "Failed to fetch contests", Toast.LENGTH_SHORT).show()
+        );
+
         requestQueue.add(request);
     }
 
-    private void fetchContestsFromCodeChef(Runnable callback) {
-        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, CC_API_URL, null,
-                response -> {
-                    try {
-                        JSONArray contests = response.getJSONArray("data");
-                        for (int i = 0; i < contests.length(); i++) {
-                            JSONObject contest = contests.getJSONObject(i);
-                            String status = contest.optString("status");
-                            if ("UPCOMING".equals(status)) {
-                                String name = contest.optString("name");
-                                long startTimeMillis = contest.optLong("start_date_unix", 0) * 1000;
-                                String code = contest.optString("code");
-                                // Use code.hashCode as ID (unique)
-                                int id = code.hashCode();
-                                contestList.add(new Contest(id, name, startTimeMillis, "codechef"));
-                            }
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    callback.run();
-                },
-                error -> {
-                    Toast.makeText(this, "Failed to fetch CodeChef contests", Toast.LENGTH_SHORT).show();
-                    callback.run();
-                });
-        requestQueue.add(request);
+    private void saveContestsJson(String json) {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit().putString(KEY_CONTESTS_JSON, json).apply();
     }
 
-    private void saveContestsJson() {
-        try {
-            JSONArray jsonArray = new JSONArray();
-            for (Contest c : contestList) {
-                JSONObject obj = new JSONObject();
-                obj.put("id", c.getId());
-                obj.put("name", c.getName());
-                obj.put("startTimeSeconds", c.getStartTime() / 1000);
-                obj.put("phase", "BEFORE");
-                obj.put("platform", c.getPlatform());
-                jsonArray.put(obj);
+    public int getSavedReminderOffset() {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        return prefs.getInt(KEY_REMINDER_OFFSET, 15);
+    }
+
+    public void saveReminderOffset(int offset) {
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        prefs.edit().putInt(KEY_REMINDER_OFFSET, offset).apply();
+    }
+
+    private void scheduleReminders(int offsetMinutes) {
+        for (Contest contest : contestList) {
+            long reminderTime = contest.getStartTime() - (offsetMinutes * 60 * 1000);
+            if (reminderTime > System.currentTimeMillis()) {
+                Intent intent = new Intent(this, NotificationReceiver.class);
+                intent.putExtra("contest_name", contest.getName());
+                intent.putExtra("contest_id", contest.getId());
+
+                PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                        this,
+                        contest.getId(),
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+
+                alarmManager.setExact(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent);
             }
-            SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-            prefs.edit().putString(KEY_CONTESTS_JSON, jsonArray.toString()).apply();
+        }
+        Toast.makeText(this, "Reminders scheduled", Toast.LENGTH_SHORT).show();
+    }
+
+    // এই মেথড সব পূর্বের সেট করা এলার্ম বাতিল করবে
+    private void cancelAllAlarms() {
+        if (alarmManager == null) {
+            alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        }
+        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
+        String contestsJson = prefs.getString(KEY_CONTESTS_JSON, null);
+        if (contestsJson == null) return;
+
+        try {
+            JSONArray contests = new JSONArray(contestsJson);
+            for (int i = 0; i < contests.length(); i++) {
+                JSONObject contest = contests.getJSONObject(i);
+                int contestId = contest.getInt("id");
+
+                Intent intent = new Intent(this, NotificationReceiver.class);
+                PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                        this,
+                        contestId,
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
+
+                alarmManager.cancel(pendingIntent);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    private List<Integer> getSavedReminderOffsets() {
-        SharedPreferences prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        String offsetsString = prefs.getString(KEY_REMINDER_OFFSETS, "60,30,10");
-        String[] parts = offsetsString.split(",");
-        List<Integer> offsets = new ArrayList<>();
-        try {
-            for (String part : parts) {
-                offsets.add(Integer.parseInt(part.trim()));
-            }
-        } catch (Exception e) {
-            offsets.clear();
-            offsets.add(60);
-            offsets.add(30);
-            offsets.add(10);
-        }
-        return offsets;
-    }
-
-    private void scheduleAllReminders() {
-        List<Integer> offsets = getSavedReminderOffsets();
-        alarmManager.cancelAllAlarms(this);
-
-        for (Contest contest : contestList) {
-            long startTime = contest.getStartTime();
-            for (int i = 0; i < offsets.size(); i++) {
-                int offset = offsets.get(i);
-                long reminderTime = startTime - offset * 60 * 1000L;
-                if (reminderTime > System.currentTimeMillis()) {
-                    Intent intent = new Intent(this, NotificationReceiver.class);
-                    intent.putExtra("contest_name", contest.getName());
-                    intent.putExtra("contest_id", contest.getId());
-                    intent.putExtra("notification_id", contest.getId() * 10 + i); // unique notification id
-
-                    PendingIntent pendingIntent = PendingIntent.getBroadcast(this,
-                            contest.getId() * 10 + i, intent,
-                            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-
-                    alarmManager.setExact(AlarmManager.RTC_WAKEUP, reminderTime, pendingIntent);
-                }
-            }
-        }
-        Toast.makeText(this, "Reminders scheduled for all contests", Toast.LENGTH_SHORT).show();
-    }
-
     private void openContestLink(Contest contest) {
-        String url = "";
-        if ("codeforces".equals(contest.getPlatform())) {
-            url = "https://codeforces.com/contest/" + contest.getId();
-        } else if ("codechef".equals(contest.getPlatform())) {
-            url = "https://www.codechef.com/contests/" + contest.getId();
-        }
-        Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        Intent browserIntent = new Intent(Intent.ACTION_VIEW,
+                Uri.parse("https://codeforces.com/contest/" + contest.getId()));
         startActivity(browserIntent);
     }
 
@@ -227,13 +202,13 @@ public class MainActivity extends AppCompatActivity {
     };
 
     @Override
-    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+    public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu, menu);
         return true;
     }
 
     @Override
-    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+    public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_settings) {
             startActivity(new Intent(this, SettingsActivity.class));
             return true;
