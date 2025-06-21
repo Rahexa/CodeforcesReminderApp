@@ -13,8 +13,19 @@ public class Contest {
         this.phase = phase;
     }
 
-    public int getId() { return id; }
-    public String getName() { return name; }
-    public long getStartTime() { return startTime; }
-    public String getPhase() { return phase; }
+    public int getId() {
+        return id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public long getStartTime() {
+        return startTime;
+    }
+
+    public String getPhase() {
+        return phase;
+    }
 }
